@@ -503,13 +503,24 @@
                 await pyodide.runPythonAsync(`
                     import micropip
 
-                    # Install all provider packages
-                    print("Installing OpenAI...")
-                    await micropip.install('openai')
+                    # Install compatible versions without C extensions
+                    print("Installing OpenAI (this may take a minute)...")
+                    try:
+                        # Try newer version first
+                        await micropip.install('openai', keep_going=True)
+                    except:
+                        # Fall back to older version if needed
+                        await micropip.install('openai==1.12.0')
+
                     print("Installing Anthropic...")
-                    await micropip.install('anthropic')
+                    try:
+                        await micropip.install('anthropic', keep_going=True)
+                    except:
+                        await micropip.install('anthropic==0.18.0')
+
                     print("Installing Gemini...")
                     await micropip.install('google-generativeai')
+
                     print("✓ All packages installed")
                 `);
 
