@@ -484,28 +484,37 @@
 
         async function initPyodide() {
             try {
-                setStatus('⏳ Loading Pyodide...', 'loading');
+                setStatus('⏳ Loading Pyodide runtime (15-30 seconds)...', 'loading');
+                console.log('Starting Pyodide load...');
 
                 pyodide = await loadPyodide({
                     indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
                 });
 
-                setStatus('⏳ Installing packages (this may take 1-2 minutes)...', 'loading');
+                console.log('Pyodide loaded, installing packages...');
+                setStatus('⏳ Installing packages (30-60 seconds, be patient)...', 'loading');
 
+                console.log('Loading micropip...');
                 await pyodide.loadPackage(['micropip']);
+
+                setStatus('⏳ Installing OpenAI package...', 'loading');
+                console.log('Installing packages...');
 
                 await pyodide.runPythonAsync(`
                     import micropip
 
                     # Install all provider packages
-                    await micropip.install([
-                        'openai',
-                        'anthropic',
-                        'google-generativeai'
-                    ])
-
+                    print("Installing OpenAI...")
+                    await micropip.install('openai')
+                    print("Installing Anthropic...")
+                    await micropip.install('anthropic')
+                    print("Installing Gemini...")
+                    await micropip.install('google-generativeai')
                     print("✓ All packages installed")
                 `);
+
+                console.log('Packages installed, creating Python interface...');
+                setStatus('⏳ Setting up LLM interfaces...', 'loading');
 
                 // Create Python interfaces for all providers
                 await pyodide.runPythonAsync(`
