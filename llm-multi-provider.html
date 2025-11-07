@@ -491,136 +491,8 @@
                     indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
                 });
 
-                console.log('Pyodide loaded, installing packages...');
-                setStatus('⏳ Installing packages (30-60 seconds, be patient)...', 'loading');
-
-                console.log('Loading micropip and SSL support...');
-                await pyodide.loadPackage(['micropip', 'ssl', 'certifi']);
-
-                setStatus('⏳ Installing HTTP client...', 'loading');
-                console.log('Installing packages...');
-
-                await pyodide.runPythonAsync(`
-                    import micropip
-
-                    # Use httpx for direct API calls (pure Python, no C extensions)
-                    print("Installing HTTP client...")
-                    await micropip.install('httpx')
-
-                    print("✓ HTTP client installed - using direct API calls")
-                `);
-
-                console.log('Packages installed, creating Python interface...');
-                setStatus('⏳ Setting up LLM interfaces...', 'loading');
-
-                // Create Python interfaces using direct HTTP API calls
-                await pyodide.runPythonAsync(`
-                    import httpx
-                    import json
-
-                    class MultiProviderLLM:
-                        def __init__(self):
-                            self.openai_key = None
-                            self.anthropic_key = None
-                            self.gemini_key = None
-
-                        def set_openai_key(self, api_key):
-                            self.openai_key = api_key
-
-                        def set_anthropic_key(self, api_key):
-                            self.anthropic_key = api_key
-
-                        def set_gemini_key(self, api_key):
-                            self.gemini_key = api_key
-
-                        def openai_prompt(self, prompt_text, model="gpt-4o-mini"):
-                            if not self.openai_key:
-                                return "Error: OpenAI API key not set"
-                            try:
-                                import traceback
-                                headers = {
-                                    "Authorization": f"Bearer {self.openai_key}",
-                                    "Content-Type": "application/json"
-                                }
-                                data = {
-                                    "model": model,
-                                    "messages": [{"role": "user", "content": prompt_text}]
-                                }
-                                # Increase timeout and add better error handling
-                                response = httpx.post(
-                                    "https://api.openai.com/v1/chat/completions",
-                                    headers=headers,
-                                    json=data,
-                                    timeout=120.0
-                                )
-
-                                # Check status
-                                if response.status_code != 200:
-                                    return f"Error: HTTP {response.status_code} - {response.text}"
-
-                                result = response.json()
-                                return result["choices"][0]["message"]["content"]
-                            except httpx.TimeoutException:
-                                return "Error: Request timed out. Try again or check your internet connection."
-                            except httpx.HTTPError as e:
-                                return f"Error: HTTP request failed - {str(e)}"
-                            except Exception as e:
-                                import traceback
-                                return f"Error: {str(e)}\\n{traceback.format_exc()}"
-
-                        def anthropic_prompt(self, prompt_text, model="claude-3-5-sonnet-20241022"):
-                            if not self.anthropic_key:
-                                return "Error: Anthropic API key not set"
-                            try:
-                                headers = {
-                                    "x-api-key": self.anthropic_key,
-                                    "anthropic-version": "2023-06-01",
-                                    "Content-Type": "application/json"
-                                }
-                                data = {
-                                    "model": model,
-                                    "max_tokens": 4096,
-                                    "messages": [{"role": "user", "content": prompt_text}]
-                                }
-                                response = httpx.post(
-                                    "https://api.anthropic.com/v1/messages",
-                                    headers=headers,
-                                    json=data,
-                                    timeout=60.0
-                                )
-                                response.raise_for_status()
-                                result = response.json()
-                                return result["content"][0]["text"]
-                            except Exception as e:
-                                return f"Error: {str(e)}"
-
-                        def gemini_prompt(self, prompt_text, model="gemini-1.5-pro"):
-                            if not self.gemini_key:
-                                return "Error: Gemini API key not set"
-                            try:
-                                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.gemini_key}"
-                                headers = {"Content-Type": "application/json"}
-                                data = {
-                                    "contents": [{
-                                        "parts": [{"text": prompt_text}]
-                                    }]
-                                }
-                                response = httpx.post(
-                                    url,
-                                    headers=headers,
-                                    json=data,
-                                    timeout=60.0
-                                )
-                                response.raise_for_status()
-                                result = response.json()
-                                return result["candidates"][0]["content"]["parts"][0]["text"]
-                            except Exception as e:
-                                return f"Error: {str(e)}"
-
-                    # Create global instance
-                    multi_llm = MultiProviderLLM()
-                    print("✓ Multi-provider LLM ready (using direct HTTP APIs)")
-                `);
+                console.log('Pyodide loaded successfully');
+                setStatus('⏳ LLM interfaces ready (using native JavaScript)...', 'loading');
 
                 setStatus('✅ Ready! Select a provider and enter your API key to start.', 'ready');
                 runButton.disabled = false;
@@ -631,6 +503,77 @@
                 console.error(error);
                 addOutput(`Initialization failed: ${error.message}`, true);
             }
+        }
+
+        // API call functions using JavaScript fetch
+        async function callOpenAI(apiKey, prompt, model) {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [{ role: 'user', content: prompt }]
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`OpenAI API error: ${response.status} - ${error}`);
+            }
+
+            const data = await response.json();
+            return data.choices[0].message.content;
+        }
+
+        async function callAnthropic(apiKey, prompt, model) {
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: model,
+                    max_tokens: 4096,
+                    messages: [{ role: 'user', content: prompt }]
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`Anthropic API error: ${response.status} - ${error}`);
+            }
+
+            const data = await response.json();
+            return data.content[0].text;
+        }
+
+        async function callGemini(apiKey, prompt, model) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{ text: prompt }]
+                    }]
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`Gemini API error: ${response.status} - ${error}`);
+            }
+
+            const data = await response.json();
+            return data.candidates[0].content.parts[0].text;
         }
 
         async function runPrompt() {
@@ -671,23 +614,14 @@
                 // Save prompt to history before running
                 savePromptToHistory(prompt);
 
-                // Set API key and run prompt based on provider
+                // Make API call using JavaScript fetch (works better in browser)
                 let result;
                 if (provider === 'openai') {
-                    await pyodide.runPythonAsync(`multi_llm.set_openai_key("${apiKey}")`);
-                    result = await pyodide.runPythonAsync(`
-                        multi_llm.openai_prompt('''${prompt.replace(/'/g, "\\'")}''', "${model}")
-                    `);
+                    result = await callOpenAI(apiKey, prompt, model);
                 } else if (provider === 'anthropic') {
-                    await pyodide.runPythonAsync(`multi_llm.set_anthropic_key("${apiKey}")`);
-                    result = await pyodide.runPythonAsync(`
-                        multi_llm.anthropic_prompt('''${prompt.replace(/'/g, "\\'")}''', "${model}")
-                    `);
+                    result = await callAnthropic(apiKey, prompt, model);
                 } else if (provider === 'gemini') {
-                    await pyodide.runPythonAsync(`multi_llm.set_gemini_key("${apiKey}")`);
-                    result = await pyodide.runPythonAsync(`
-                        multi_llm.gemini_prompt('''${prompt.replace(/'/g, "\\'")}''', "${model}")
-                    `);
+                    result = await callGemini(apiKey, prompt, model);
                 }
 
                 addOutput(result);
