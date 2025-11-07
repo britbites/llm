@@ -185,6 +185,48 @@
             color: #888;
             font-size: 0.8em;
         }
+
+        /* History navigation buttons */
+        .prompt-container {
+            position: relative;
+        }
+
+        .history-nav {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .history-btn {
+            background: #222;
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 8px 15px;
+            font-size: 0.9em;
+            border-radius: 5px;
+            cursor: pointer;
+            width: auto;
+            flex: 1;
+        }
+
+        .history-btn:disabled {
+            background: #111;
+            color: #444;
+            border-color: #444;
+            cursor: not-allowed;
+        }
+
+        .history-btn:active:not(:disabled) {
+            background: #0c0;
+            color: #000;
+        }
+
+        .history-info {
+            color: #888;
+            font-size: 0.8em;
+            margin-bottom: 5px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -196,7 +238,8 @@
         </div>
 
         <div class="info">
-            ℹ️ Access OpenAI, Anthropic Claude, and Google Gemini - all from your iPhone!
+            ℹ️ Access OpenAI, Anthropic Claude, and Google Gemini - all from your iPhone!<br>
+            📜 Use ↑/↓ arrows to navigate prompt history (like a shell)
         </div>
 
         <div class="config-section">
@@ -258,8 +301,19 @@
         </div>
 
         <div class="input-section">
-            <label for="prompt">Prompt:</label>
-            <textarea id="prompt" placeholder="Enter your prompt here...">What is the capital of France?</textarea>
+            <div class="prompt-container">
+                <label for="prompt">Prompt:</label>
+
+                <!-- History navigation -->
+                <div class="history-nav">
+                    <button class="history-btn" id="prevPrompt" title="Previous prompt (↑)">↑ Previous</button>
+                    <button class="history-btn" id="nextPrompt" title="Next prompt (↓)">↓ Next</button>
+                    <button class="history-btn" id="clearHistory" title="Clear history">🗑️ Clear History</button>
+                </div>
+                <div class="history-info" id="historyInfo"></div>
+
+                <textarea id="prompt" placeholder="Enter your prompt here...">What is the capital of France?</textarea>
+            </div>
 
             <button id="runButton" disabled>Run Prompt</button>
             <button id="clearButton">Clear Output</button>
@@ -270,9 +324,10 @@
         <div class="info">
             <strong>Tips:</strong><br>
             • Save to home screen for app-like experience<br>
+            • Use ↑/↓ buttons or arrow keys to navigate prompt history<br>
+            • Edit previous prompts and re-run them<br>
             • API keys stored locally in browser only<br>
-            • Works offline after initial load (except API calls)<br>
-            • Switch providers with tabs above
+            • Works offline after initial load (except API calls)
         </div>
     </div>
 
@@ -280,11 +335,20 @@
         let pyodide;
         let currentProvider = 'openai';
 
+        // Prompt history management
+        let promptHistory = JSON.parse(localStorage.getItem('prompt_history') || '[]');
+        let historyIndex = promptHistory.length; // Start at end (newest)
+        let currentPrompt = ''; // Store current unsaved prompt
+
         const statusEl = document.getElementById('status');
         const outputEl = document.getElementById('output');
         const runButton = document.getElementById('runButton');
         const clearButton = document.getElementById('clearButton');
         const promptInput = document.getElementById('prompt');
+        const prevPromptBtn = document.getElementById('prevPrompt');
+        const nextPromptBtn = document.getElementById('nextPrompt');
+        const clearHistoryBtn = document.getElementById('clearHistory');
+        const historyInfoEl = document.getElementById('historyInfo');
 
         // Load saved API keys
         document.getElementById('openaiKey').value = localStorage.getItem('openai_api_key') || '';
@@ -315,6 +379,93 @@
                 document.getElementById(`${provider}-section`).classList.add('active');
                 currentProvider = provider;
             });
+        });
+
+        // History management functions
+        function updateHistoryButtons() {
+            prevPromptBtn.disabled = historyIndex <= 0 || promptHistory.length === 0;
+            nextPromptBtn.disabled = historyIndex >= promptHistory.length;
+            clearHistoryBtn.disabled = promptHistory.length === 0;
+
+            if (promptHistory.length > 0) {
+                historyInfoEl.textContent = `History: ${historyIndex}/${promptHistory.length}`;
+            } else {
+                historyInfoEl.textContent = 'No history yet';
+            }
+        }
+
+        function savePromptToHistory(prompt) {
+            const trimmed = prompt.trim();
+            if (!trimmed) return;
+
+            // Don't save if it's the same as the last prompt
+            if (promptHistory.length > 0 && promptHistory[promptHistory.length - 1] === trimmed) {
+                return;
+            }
+
+            promptHistory.push(trimmed);
+
+            // Limit history to last 100 prompts
+            if (promptHistory.length > 100) {
+                promptHistory.shift();
+            }
+
+            localStorage.setItem('prompt_history', JSON.stringify(promptHistory));
+            historyIndex = promptHistory.length;
+            updateHistoryButtons();
+        }
+
+        function navigateHistory(direction) {
+            if (promptHistory.length === 0) return;
+
+            // Save current prompt if we're at the end
+            if (historyIndex === promptHistory.length) {
+                currentPrompt = promptInput.value;
+            }
+
+            // Navigate
+            if (direction === 'prev' && historyIndex > 0) {
+                historyIndex--;
+                promptInput.value = promptHistory[historyIndex];
+            } else if (direction === 'next' && historyIndex < promptHistory.length) {
+                historyIndex++;
+                if (historyIndex === promptHistory.length) {
+                    // Restore current prompt
+                    promptInput.value = currentPrompt;
+                } else {
+                    promptInput.value = promptHistory[historyIndex];
+                }
+            }
+
+            updateHistoryButtons();
+            promptInput.focus();
+        }
+
+        // History button handlers
+        prevPromptBtn.addEventListener('click', () => navigateHistory('prev'));
+        nextPromptBtn.addEventListener('click', () => navigateHistory('next'));
+
+        clearHistoryBtn.addEventListener('click', () => {
+            if (confirm('Clear all prompt history?')) {
+                promptHistory = [];
+                historyIndex = 0;
+                localStorage.removeItem('prompt_history');
+                updateHistoryButtons();
+            }
+        });
+
+        // Keyboard shortcuts for history navigation
+        promptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                navigateHistory('prev');
+            } else if (e.key === 'ArrowDown' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                navigateHistory('next');
+            } else if (e.key === 'Enter' && !e.shiftKey && !runButton.disabled) {
+                e.preventDefault();
+                runPrompt();
+            }
         });
 
         function setStatus(message, type = 'loading') {
@@ -417,6 +568,7 @@
 
                 setStatus('✅ Ready! Select a provider and enter your API key to start.', 'ready');
                 runButton.disabled = false;
+                updateHistoryButtons();
 
             } catch (error) {
                 setStatus(`❌ Error: ${error.message}`, 'error');
@@ -460,6 +612,9 @@
                 setStatus(`⏳ Sending prompt to ${currentProvider}...`, 'loading');
                 addOutput('Waiting for response...');
 
+                // Save prompt to history before running
+                savePromptToHistory(prompt);
+
                 // Set API key and run prompt based on provider
                 let result;
                 if (provider === 'openai') {
@@ -495,15 +650,6 @@
         runButton.addEventListener('click', runPrompt);
         clearButton.addEventListener('click', () => {
             outputEl.textContent = 'Output cleared.';
-        });
-
-        promptInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                if (!runButton.disabled) {
-                    runPrompt();
-                }
-            }
         });
 
         // Initialize on load
