@@ -537,6 +537,7 @@
                             if not self.openai_key:
                                 return "Error: OpenAI API key not set"
                             try:
+                                import traceback
                                 headers = {
                                     "Authorization": f"Bearer {self.openai_key}",
                                     "Content-Type": "application/json"
@@ -545,17 +546,27 @@
                                     "model": model,
                                     "messages": [{"role": "user", "content": prompt_text}]
                                 }
+                                # Increase timeout and add better error handling
                                 response = httpx.post(
                                     "https://api.openai.com/v1/chat/completions",
                                     headers=headers,
                                     json=data,
-                                    timeout=60.0
+                                    timeout=120.0
                                 )
-                                response.raise_for_status()
+
+                                # Check status
+                                if response.status_code != 200:
+                                    return f"Error: HTTP {response.status_code} - {response.text}"
+
                                 result = response.json()
                                 return result["choices"][0]["message"]["content"]
+                            except httpx.TimeoutException:
+                                return "Error: Request timed out. Try again or check your internet connection."
+                            except httpx.HTTPError as e:
+                                return f"Error: HTTP request failed - {str(e)}"
                             except Exception as e:
-                                return f"Error: {str(e)}"
+                                import traceback
+                                return f"Error: {str(e)}\\n{traceback.format_exc()}"
 
                         def anthropic_prompt(self, prompt_text, model="claude-3-5-sonnet-20241022"):
                             if not self.anthropic_key:
