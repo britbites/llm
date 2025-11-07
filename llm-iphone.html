@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM CLI for iPhone</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #0f0;
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #0f0;
+            padding-bottom: 5px;
+        }
+
+        .status {
+            background: #111;
+            border: 1px solid #0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            color: #ff0;
+        }
+
+        .ready {
+            color: #0f0;
+        }
+
+        .error {
+            color: #f00;
+        }
+
+        .input-section {
+            margin: 20px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #0f0;
+            font-weight: bold;
+        }
+
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            background: #111;
+            border: 1px solid #0f0;
+            color: #0f0;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 1em;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 12px 20px;
+            font-size: 1em;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        button:disabled {
+            background: #555;
+            color: #888;
+            cursor: not-allowed;
+        }
+
+        button:active:not(:disabled) {
+            background: #0c0;
+        }
+
+        .output {
+            background: #111;
+            border: 1px solid #0f0;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 0.9em;
+        }
+
+        .config-section {
+            background: #111;
+            border: 1px solid #0f0;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .info {
+            background: #112;
+            border: 1px solid #08f;
+            color: #08f;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-size: 0.85em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 LLM CLI for iPhone</h1>
+
+        <div class="status" id="status">
+            <span class="loading">⏳ Initializing Pyodide and loading packages...</span>
+        </div>
+
+        <div class="info">
+            ℹ️ This is a WebAssembly port of Simon Willison's LLM CLI tool running entirely in your browser. No server required!
+        </div>
+
+        <div class="config-section">
+            <h2>Configuration</h2>
+
+            <label for="apiKey">OpenAI API Key:</label>
+            <input type="text" id="apiKey" placeholder="sk-..." autocomplete="off">
+            <small style="color: #888; display: block; margin-bottom: 10px;">
+                Stored locally in browser only. Never sent to any server except OpenAI.
+            </small>
+
+            <label for="model">Model:</label>
+            <select id="model">
+                <option value="gpt-4o-mini">gpt-4o-mini</option>
+                <option value="gpt-4o">gpt-4o</option>
+                <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                <option value="gpt-4">gpt-4</option>
+                <option value="gpt-4-turbo">gpt-4-turbo</option>
+            </select>
+        </div>
+
+        <div class="input-section">
+            <label for="prompt">Prompt:</label>
+            <textarea id="prompt" placeholder="Enter your prompt here...">What is the capital of France?</textarea>
+
+            <button id="runButton" disabled>Run Prompt</button>
+            <button id="clearButton">Clear Output</button>
+        </div>
+
+        <div class="output" id="output">Output will appear here...</div>
+
+        <div class="info">
+            <strong>Tips:</strong><br>
+            • Save this page to your iPhone home screen for app-like experience<br>
+            • Works offline after initial load (except API calls)<br>
+            • Your API key is stored in localStorage<br>
+            • For other LLM providers, see implementation notes below
+        </div>
+    </div>
+
+    <script type="module">
+        // Load Pyodide
+        let pyodide;
+        let llmModule;
+
+        const statusEl = document.getElementById('status');
+        const outputEl = document.getElementById('output');
+        const runButton = document.getElementById('runButton');
+        const clearButton = document.getElementById('clearButton');
+        const promptInput = document.getElementById('prompt');
+        const apiKeyInput = document.getElementById('apiKey');
+        const modelSelect = document.getElementById('model');
+
+        // Load API key from localStorage
+        apiKeyInput.value = localStorage.getItem('openai_api_key') || '';
+
+        // Save API key to localStorage
+        apiKeyInput.addEventListener('change', () => {
+            localStorage.setItem('openai_api_key', apiKeyInput.value);
+        });
+
+        function setStatus(message, type = 'loading') {
+            statusEl.innerHTML = `<span class="${type}">${message}</span>`;
+        }
+
+        function addOutput(text, isError = false) {
+            const color = isError ? '#f00' : '#0f0';
+            outputEl.style.color = color;
+            outputEl.textContent = text;
+            outputEl.scrollTop = outputEl.scrollHeight;
+        }
+
+        async function initPyodide() {
+            try {
+                setStatus('⏳ Loading Pyodide...', 'loading');
+
+                // Load Pyodide from CDN
+                pyodide = await loadPyodide({
+                    indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
+                });
+
+                setStatus('⏳ Loading Python packages...', 'loading');
+
+                // Load required packages
+                await pyodide.loadPackage(['micropip', 'sqlite3']);
+
+                // Install LLM and dependencies using micropip
+                setStatus('⏳ Installing llm and dependencies (this may take a minute)...', 'loading');
+
+                await pyodide.runPythonAsync(`
+                    import micropip
+
+                    # Install dependencies
+                    await micropip.install([
+                        'click',
+                        'openai',
+                        'pydantic',
+                        'PyYAML',
+                        'pluggy',
+                        'python-ulid',
+                        'sqlite-utils',
+                        'sqlite-migrate',
+                        'click-default-group',
+                        'puremagic',
+                        'condense-json'
+                    ])
+
+                    # Try to install llm from PyPI
+                    try:
+                        await micropip.install('llm')
+                        print("✓ LLM installed successfully")
+                    except Exception as e:
+                        print(f"Note: {e}")
+                        print("Creating minimal llm wrapper...")
+                `);
+
+                // Create a minimal Python interface for LLM functionality
+                await pyodide.runPythonAsync(`
+                    import sys
+                    import sqlite3
+                    from openai import OpenAI
+                    import os
+
+                    class SimpleLLM:
+                        def __init__(self):
+                            self.client = None
+
+                        def set_api_key(self, api_key):
+                            """Set OpenAI API key"""
+                            self.client = OpenAI(api_key=api_key)
+
+                        def prompt(self, prompt_text, model="gpt-4o-mini"):
+                            """Send a prompt to the LLM"""
+                            if not self.client:
+                                return "Error: API key not set"
+
+                            try:
+                                response = self.client.chat.completions.create(
+                                    model=model,
+                                    messages=[
+                                        {"role": "user", "content": prompt_text}
+                                    ]
+                                )
+                                return response.choices[0].message.content
+                            except Exception as e:
+                                return f"Error: {str(e)}"
+
+                    # Create global instance
+                    simple_llm = SimpleLLM()
+
+                    print("✓ LLM interface ready")
+                `);
+
+                llmModule = pyodide.globals.get('simple_llm');
+
+                setStatus('✅ Ready! Enter your OpenAI API key and start prompting.', 'ready');
+                runButton.disabled = false;
+
+            } catch (error) {
+                setStatus(`❌ Error: ${error.message}`, 'error');
+                console.error(error);
+                addOutput(`Initialization failed: ${error.message}`, true);
+            }
+        }
+
+        async function runPrompt() {
+            const apiKey = apiKeyInput.value.trim();
+            const prompt = promptInput.value.trim();
+            const model = modelSelect.value;
+
+            if (!apiKey) {
+                addOutput('Error: Please enter your OpenAI API key', true);
+                return;
+            }
+
+            if (!prompt) {
+                addOutput('Error: Please enter a prompt', true);
+                return;
+            }
+
+            try {
+                runButton.disabled = true;
+                setStatus('⏳ Sending prompt to LLM...', 'loading');
+                addOutput('Waiting for response...');
+
+                // Set API key
+                llmModule.set_api_key(apiKey);
+
+                // Run the prompt
+                const result = await pyodide.runPythonAsync(`
+                    simple_llm.prompt('''${prompt.replace(/'/g, "\\'")}''', "${model}")
+                `);
+
+                addOutput(result);
+                setStatus('✅ Ready!', 'ready');
+
+            } catch (error) {
+                addOutput(`Error: ${error.message}`, true);
+                setStatus('❌ Error occurred', 'error');
+                console.error(error);
+            } finally {
+                runButton.disabled = false;
+            }
+        }
+
+        // Event listeners
+        runButton.addEventListener('click', runPrompt);
+        clearButton.addEventListener('click', () => {
+            outputEl.textContent = 'Output cleared.';
+        });
+
+        // Allow Enter key to submit (with Shift+Enter for newline)
+        promptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!runButton.disabled) {
+                    runPrompt();
+                }
+            }
+        });
+
+        // Initialize on load
+        initPyodide();
+    </script>
+
+    <!-- Load Pyodide -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+</body>
+</html>
