@@ -503,90 +503,112 @@
                 await pyodide.runPythonAsync(`
                     import micropip
 
-                    # Install compatible versions without C extensions
-                    print("Installing OpenAI (this may take a minute)...")
-                    try:
-                        # Try newer version first
-                        await micropip.install('openai', keep_going=True)
-                    except:
-                        # Fall back to older version if needed
-                        await micropip.install('openai==1.12.0')
+                    # Use httpx for direct API calls (pure Python, no C extensions)
+                    print("Installing HTTP client...")
+                    await micropip.install('httpx')
 
-                    print("Installing Anthropic...")
-                    try:
-                        await micropip.install('anthropic', keep_going=True)
-                    except:
-                        await micropip.install('anthropic==0.18.0')
-
-                    print("Installing Gemini...")
-                    await micropip.install('google-generativeai')
-
-                    print("✓ All packages installed")
+                    print("✓ HTTP client installed - using direct API calls")
                 `);
 
                 console.log('Packages installed, creating Python interface...');
                 setStatus('⏳ Setting up LLM interfaces...', 'loading');
 
-                // Create Python interfaces for all providers
+                // Create Python interfaces using direct HTTP API calls
                 await pyodide.runPythonAsync(`
-                    from openai import OpenAI
-                    from anthropic import Anthropic
-                    import google.generativeai as genai
+                    import httpx
+                    import json
 
                     class MultiProviderLLM:
                         def __init__(self):
-                            self.openai_client = None
-                            self.anthropic_client = None
-                            self.gemini_configured = False
+                            self.openai_key = None
+                            self.anthropic_key = None
+                            self.gemini_key = None
 
                         def set_openai_key(self, api_key):
-                            self.openai_client = OpenAI(api_key=api_key)
+                            self.openai_key = api_key
 
                         def set_anthropic_key(self, api_key):
-                            self.anthropic_client = Anthropic(api_key=api_key)
+                            self.anthropic_key = api_key
 
                         def set_gemini_key(self, api_key):
-                            genai.configure(api_key=api_key)
-                            self.gemini_configured = True
+                            self.gemini_key = api_key
 
                         def openai_prompt(self, prompt_text, model="gpt-4o-mini"):
-                            if not self.openai_client:
+                            if not self.openai_key:
                                 return "Error: OpenAI API key not set"
                             try:
-                                response = self.openai_client.chat.completions.create(
-                                    model=model,
-                                    messages=[{"role": "user", "content": prompt_text}]
+                                headers = {
+                                    "Authorization": f"Bearer {self.openai_key}",
+                                    "Content-Type": "application/json"
+                                }
+                                data = {
+                                    "model": model,
+                                    "messages": [{"role": "user", "content": prompt_text}]
+                                }
+                                response = httpx.post(
+                                    "https://api.openai.com/v1/chat/completions",
+                                    headers=headers,
+                                    json=data,
+                                    timeout=60.0
                                 )
-                                return response.choices[0].message.content
+                                response.raise_for_status()
+                                result = response.json()
+                                return result["choices"][0]["message"]["content"]
                             except Exception as e:
                                 return f"Error: {str(e)}"
 
                         def anthropic_prompt(self, prompt_text, model="claude-3-5-sonnet-20241022"):
-                            if not self.anthropic_client:
+                            if not self.anthropic_key:
                                 return "Error: Anthropic API key not set"
                             try:
-                                response = self.anthropic_client.messages.create(
-                                    model=model,
-                                    max_tokens=4096,
-                                    messages=[{"role": "user", "content": prompt_text}]
+                                headers = {
+                                    "x-api-key": self.anthropic_key,
+                                    "anthropic-version": "2023-06-01",
+                                    "Content-Type": "application/json"
+                                }
+                                data = {
+                                    "model": model,
+                                    "max_tokens": 4096,
+                                    "messages": [{"role": "user", "content": prompt_text}]
+                                }
+                                response = httpx.post(
+                                    "https://api.anthropic.com/v1/messages",
+                                    headers=headers,
+                                    json=data,
+                                    timeout=60.0
                                 )
-                                return response.content[0].text
+                                response.raise_for_status()
+                                result = response.json()
+                                return result["content"][0]["text"]
                             except Exception as e:
                                 return f"Error: {str(e)}"
 
                         def gemini_prompt(self, prompt_text, model="gemini-1.5-pro"):
-                            if not self.gemini_configured:
+                            if not self.gemini_key:
                                 return "Error: Gemini API key not set"
                             try:
-                                model_instance = genai.GenerativeModel(model)
-                                response = model_instance.generate_content(prompt_text)
-                                return response.text
+                                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.gemini_key}"
+                                headers = {"Content-Type": "application/json"}
+                                data = {
+                                    "contents": [{
+                                        "parts": [{"text": prompt_text}]
+                                    }]
+                                }
+                                response = httpx.post(
+                                    url,
+                                    headers=headers,
+                                    json=data,
+                                    timeout=60.0
+                                )
+                                response.raise_for_status()
+                                result = response.json()
+                                return result["candidates"][0]["content"]["parts"][0]["text"]
                             except Exception as e:
                                 return f"Error: {str(e)}"
 
                     # Create global instance
                     multi_llm = MultiProviderLLM()
-                    print("✓ Multi-provider LLM ready")
+                    print("✓ Multi-provider LLM ready (using direct HTTP APIs)")
                 `);
 
                 setStatus('✅ Ready! Select a provider and enter your API key to start.', 'ready');
