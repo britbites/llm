@@ -2,12 +2,33 @@
 
 Run [Simon Willison's LLM tool](https://github.com/simonw/llm) on your iPhone using WebAssembly (Pyodide) or a-Shell app.
 
+## 🚀 Quick Start - Multi-Provider Web App
+
+**NEW:** `llm-multi-provider.html` - Access **OpenAI, Anthropic Claude, AND Google Gemini** from one interface!
+
+### Features:
+- ✅ **Three providers in one app**: OpenAI, Anthropic, Gemini
+- ✅ **Tab-based interface**: Easy switching between providers
+- ✅ **All models supported**: GPT-4o, Claude 3.5 Sonnet, Gemini 2.0, etc.
+- ✅ **Local storage**: API keys saved securely in browser
+- ✅ **Works offline**: After initial load
+
+### How to Use:
+1. Open `llm-multi-provider.html` in Safari
+2. Select provider tab (OpenAI / Anthropic / Gemini)
+3. Enter API key for that provider
+4. Choose model
+5. Start prompting!
+
+---
+
 ## 🎯 Overview
 
-This project provides **two ways** to run the LLM CLI tool on iPhone:
+This project provides **multiple ways** to run LLM on iPhone:
 
-1. **🌐 WebAssembly/Pyodide (Recommended)** - Run in Safari browser with no app installation required
-2. **📱 a-Shell App** - Run in a native iOS terminal emulator
+1. **🌐 Multi-Provider Web App (RECOMMENDED)** - OpenAI + Claude + Gemini in one interface
+2. **🌐 Single-Provider Web App** - OpenAI only (simpler)
+3. **📱 a-Shell App** - Terminal interface (limited features)
 
 ## 🌐 Method 1: WebAssembly (Pyodide) - Recommended
 
@@ -22,32 +43,43 @@ This project provides **two ways** to run the LLM CLI tool on iPhone:
 
 ### Setup Instructions
 
-1. **Open the web interface:**
-   - Host `llm-iphone.html` on any web server, OR
-   - Open the file directly in Safari from iCloud Drive/Files app
+#### For Multi-Provider App (Recommended):
 
-2. **Add to Home Screen (Optional but recommended):**
-   - Open `llm-iphone.html` in Safari
-   - Tap the Share button (square with arrow)
-   - Select "Add to Home Screen"
-   - Name it "LLM CLI" and tap Add
-   - Now you have a full-screen app!
+1. **Open `llm-multi-provider.html` in Safari:**
+   - Host on GitHub Pages, OR
+   - Open from iCloud Drive/Files app, OR
+   - Use htmlpreview (see deployment section below)
 
-3. **Configure your API key:**
-   - Open the app
-   - Enter your OpenAI API key (get one at https://platform.openai.com/api-keys)
-   - Your key is stored locally in browser storage only
+2. **Add to Home Screen:**
+   - Tap Share button → "Add to Home Screen"
+   - Name it "LLM Multi" and tap Add
 
-4. **Start prompting:**
-   - Enter your prompt in the text area
-   - Select your preferred model
+3. **Configure API keys:**
+   - **OpenAI**: https://platform.openai.com/api-keys
+   - **Anthropic**: https://console.anthropic.com/settings/keys
+   - **Gemini**: https://aistudio.google.com/app/apikey
+   - Enter keys in respective tabs (stored locally only)
+
+4. **Start using:**
+   - Switch tabs to change provider
+   - Select model
+   - Enter prompt
    - Tap "Run Prompt"
-   - Wait for the response!
+
+#### For Single-Provider App (OpenAI only):
+
+1. **Open `llm-iphone.html` in Safari**
+2. **Add to Home Screen** (optional)
+3. **Enter OpenAI API key**
+4. **Start prompting**
 
 ### Features
 
-- 🤖 Works with OpenAI models (GPT-4, GPT-4o, GPT-3.5-turbo, etc.)
-- 💾 API key stored locally (localStorage)
+**Multi-Provider App:**
+- 🤖 **OpenAI**: GPT-4o, GPT-4o-mini, o1, o1-mini, etc.
+- 🤖 **Anthropic**: Claude 3.5 Sonnet, Claude 3.5 Haiku, Claude 3 Opus
+- 🤖 **Gemini**: Gemini 2.0 Flash, Gemini 1.5 Pro/Flash
+- 💾 All API keys stored locally (localStorage)
 - 🎨 Terminal-style dark interface
 - 📱 Mobile-optimized and responsive
 - ⚡ Fast after initial load (~30-60 seconds first time)

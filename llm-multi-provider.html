@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Multi-Provider</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #0f0;
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #0f0;
+            padding-bottom: 5px;
+        }
+
+        h2 {
+            color: #0f0;
+            font-size: 1.2em;
+            margin: 15px 0 10px 0;
+        }
+
+        .status {
+            background: #111;
+            border: 1px solid #0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            color: #ff0;
+        }
+
+        .ready {
+            color: #0f0;
+        }
+
+        .error {
+            color: #f00;
+        }
+
+        .input-section {
+            margin: 20px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #0f0;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        textarea,
+        select {
+            width: 100%;
+            background: #111;
+            border: 1px solid #0f0;
+            color: #0f0;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 1em;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 12px 20px;
+            font-size: 1em;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        button:disabled {
+            background: #555;
+            color: #888;
+            cursor: not-allowed;
+        }
+
+        button:active:not(:disabled) {
+            background: #0c0;
+        }
+
+        .output {
+            background: #111;
+            border: 1px solid #0f0;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 0.9em;
+        }
+
+        .config-section {
+            background: #111;
+            border: 1px solid #0f0;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .provider-section {
+            background: #112;
+            border: 1px solid #08f;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .provider-section.active {
+            display: block;
+        }
+
+        .info {
+            background: #112;
+            border: 1px solid #08f;
+            color: #08f;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-size: 0.85em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .tab {
+            background: #222;
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .tab.active {
+            background: #0f0;
+            color: #000;
+        }
+
+        small {
+            color: #888;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 LLM Multi-Provider</h1>
+
+        <div class="status" id="status">
+            <span class="loading">⏳ Initializing Pyodide and loading packages...</span>
+        </div>
+
+        <div class="info">
+            ℹ️ Access OpenAI, Anthropic Claude, and Google Gemini - all from your iPhone!
+        </div>
+
+        <div class="config-section">
+            <h2>Provider Selection</h2>
+
+            <div class="tabs">
+                <div class="tab active" data-provider="openai">OpenAI</div>
+                <div class="tab" data-provider="anthropic">Anthropic</div>
+                <div class="tab" data-provider="gemini">Gemini</div>
+            </div>
+
+            <!-- OpenAI Section -->
+            <div class="provider-section active" id="openai-section">
+                <label for="openaiKey">OpenAI API Key:</label>
+                <input type="password" id="openaiKey" placeholder="sk-..." autocomplete="off">
+                <small>Get from: https://platform.openai.com/api-keys</small>
+
+                <label for="openaiModel" style="margin-top: 10px;">Model:</label>
+                <select id="openaiModel">
+                    <option value="gpt-4o-mini">gpt-4o-mini (fastest, cheapest)</option>
+                    <option value="gpt-4o">gpt-4o (most capable)</option>
+                    <option value="gpt-4-turbo">gpt-4-turbo</option>
+                    <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                    <option value="o1-mini">o1-mini (reasoning)</option>
+                    <option value="o1">o1 (advanced reasoning)</option>
+                </select>
+            </div>
+
+            <!-- Anthropic Section -->
+            <div class="provider-section" id="anthropic-section">
+                <label for="anthropicKey">Anthropic API Key:</label>
+                <input type="password" id="anthropicKey" placeholder="sk-ant-..." autocomplete="off">
+                <small>Get from: https://console.anthropic.com/settings/keys</small>
+
+                <label for="anthropicModel" style="margin-top: 10px;">Model:</label>
+                <select id="anthropicModel">
+                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (best)</option>
+                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (fast)</option>
+                    <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                    <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+                    <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                </select>
+            </div>
+
+            <!-- Gemini Section -->
+            <div class="provider-section" id="gemini-section">
+                <label for="geminiKey">Google API Key:</label>
+                <input type="password" id="geminiKey" placeholder="AIza..." autocomplete="off">
+                <small>Get from: https://aistudio.google.com/app/apikey</small>
+
+                <label for="geminiModel" style="margin-top: 10px;">Model:</label>
+                <select id="geminiModel">
+                    <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (experimental)</option>
+                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                    <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                    <option value="gemini-1.0-pro">Gemini 1.0 Pro</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="input-section">
+            <label for="prompt">Prompt:</label>
+            <textarea id="prompt" placeholder="Enter your prompt here...">What is the capital of France?</textarea>
+
+            <button id="runButton" disabled>Run Prompt</button>
+            <button id="clearButton">Clear Output</button>
+        </div>
+
+        <div class="output" id="output">Output will appear here...</div>
+
+        <div class="info">
+            <strong>Tips:</strong><br>
+            • Save to home screen for app-like experience<br>
+            • API keys stored locally in browser only<br>
+            • Works offline after initial load (except API calls)<br>
+            • Switch providers with tabs above
+        </div>
+    </div>
+
+    <script type="module">
+        let pyodide;
+        let currentProvider = 'openai';
+
+        const statusEl = document.getElementById('status');
+        const outputEl = document.getElementById('output');
+        const runButton = document.getElementById('runButton');
+        const clearButton = document.getElementById('clearButton');
+        const promptInput = document.getElementById('prompt');
+
+        // Load saved API keys
+        document.getElementById('openaiKey').value = localStorage.getItem('openai_api_key') || '';
+        document.getElementById('anthropicKey').value = localStorage.getItem('anthropic_api_key') || '';
+        document.getElementById('geminiKey').value = localStorage.getItem('gemini_api_key') || '';
+
+        // Save API keys on change
+        document.getElementById('openaiKey').addEventListener('change', (e) => {
+            localStorage.setItem('openai_api_key', e.target.value);
+        });
+        document.getElementById('anthropicKey').addEventListener('change', (e) => {
+            localStorage.setItem('anthropic_api_key', e.target.value);
+        });
+        document.getElementById('geminiKey').addEventListener('change', (e) => {
+            localStorage.setItem('gemini_api_key', e.target.value);
+        });
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Update active tab
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Update active section
+                document.querySelectorAll('.provider-section').forEach(s => s.classList.remove('active'));
+                const provider = tab.dataset.provider;
+                document.getElementById(`${provider}-section`).classList.add('active');
+                currentProvider = provider;
+            });
+        });
+
+        function setStatus(message, type = 'loading') {
+            statusEl.innerHTML = `<span class="${type}">${message}</span>`;
+        }
+
+        function addOutput(text, isError = false) {
+            const color = isError ? '#f00' : '#0f0';
+            outputEl.style.color = color;
+            outputEl.textContent = text;
+            outputEl.scrollTop = outputEl.scrollHeight;
+        }
+
+        async function initPyodide() {
+            try {
+                setStatus('⏳ Loading Pyodide...', 'loading');
+
+                pyodide = await loadPyodide({
+                    indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
+                });
+
+                setStatus('⏳ Installing packages (this may take 1-2 minutes)...', 'loading');
+
+                await pyodide.loadPackage(['micropip']);
+
+                await pyodide.runPythonAsync(`
+                    import micropip
+
+                    # Install all provider packages
+                    await micropip.install([
+                        'openai',
+                        'anthropic',
+                        'google-generativeai'
+                    ])
+
+                    print("✓ All packages installed")
+                `);
+
+                // Create Python interfaces for all providers
+                await pyodide.runPythonAsync(`
+                    from openai import OpenAI
+                    from anthropic import Anthropic
+                    import google.generativeai as genai
+
+                    class MultiProviderLLM:
+                        def __init__(self):
+                            self.openai_client = None
+                            self.anthropic_client = None
+                            self.gemini_configured = False
+
+                        def set_openai_key(self, api_key):
+                            self.openai_client = OpenAI(api_key=api_key)
+
+                        def set_anthropic_key(self, api_key):
+                            self.anthropic_client = Anthropic(api_key=api_key)
+
+                        def set_gemini_key(self, api_key):
+                            genai.configure(api_key=api_key)
+                            self.gemini_configured = True
+
+                        def openai_prompt(self, prompt_text, model="gpt-4o-mini"):
+                            if not self.openai_client:
+                                return "Error: OpenAI API key not set"
+                            try:
+                                response = self.openai_client.chat.completions.create(
+                                    model=model,
+                                    messages=[{"role": "user", "content": prompt_text}]
+                                )
+                                return response.choices[0].message.content
+                            except Exception as e:
+                                return f"Error: {str(e)}"
+
+                        def anthropic_prompt(self, prompt_text, model="claude-3-5-sonnet-20241022"):
+                            if not self.anthropic_client:
+                                return "Error: Anthropic API key not set"
+                            try:
+                                response = self.anthropic_client.messages.create(
+                                    model=model,
+                                    max_tokens=4096,
+                                    messages=[{"role": "user", "content": prompt_text}]
+                                )
+                                return response.content[0].text
+                            except Exception as e:
+                                return f"Error: {str(e)}"
+
+                        def gemini_prompt(self, prompt_text, model="gemini-1.5-pro"):
+                            if not self.gemini_configured:
+                                return "Error: Gemini API key not set"
+                            try:
+                                model_instance = genai.GenerativeModel(model)
+                                response = model_instance.generate_content(prompt_text)
+                                return response.text
+                            except Exception as e:
+                                return f"Error: {str(e)}"
+
+                    # Create global instance
+                    multi_llm = MultiProviderLLM()
+                    print("✓ Multi-provider LLM ready")
+                `);
+
+                setStatus('✅ Ready! Select a provider and enter your API key to start.', 'ready');
+                runButton.disabled = false;
+
+            } catch (error) {
+                setStatus(`❌ Error: ${error.message}`, 'error');
+                console.error(error);
+                addOutput(`Initialization failed: ${error.message}`, true);
+            }
+        }
+
+        async function runPrompt() {
+            const prompt = promptInput.value.trim();
+
+            if (!prompt) {
+                addOutput('Error: Please enter a prompt', true);
+                return;
+            }
+
+            let apiKey, model, provider;
+
+            // Get current provider settings
+            if (currentProvider === 'openai') {
+                apiKey = document.getElementById('openaiKey').value.trim();
+                model = document.getElementById('openaiModel').value;
+                provider = 'openai';
+            } else if (currentProvider === 'anthropic') {
+                apiKey = document.getElementById('anthropicKey').value.trim();
+                model = document.getElementById('anthropicModel').value;
+                provider = 'anthropic';
+            } else if (currentProvider === 'gemini') {
+                apiKey = document.getElementById('geminiKey').value.trim();
+                model = document.getElementById('geminiModel').value;
+                provider = 'gemini';
+            }
+
+            if (!apiKey) {
+                addOutput(`Error: Please enter your ${currentProvider} API key`, true);
+                return;
+            }
+
+            try {
+                runButton.disabled = true;
+                setStatus(`⏳ Sending prompt to ${currentProvider}...`, 'loading');
+                addOutput('Waiting for response...');
+
+                // Set API key and run prompt based on provider
+                let result;
+                if (provider === 'openai') {
+                    await pyodide.runPythonAsync(`multi_llm.set_openai_key("${apiKey}")`);
+                    result = await pyodide.runPythonAsync(`
+                        multi_llm.openai_prompt('''${prompt.replace(/'/g, "\\'")}''', "${model}")
+                    `);
+                } else if (provider === 'anthropic') {
+                    await pyodide.runPythonAsync(`multi_llm.set_anthropic_key("${apiKey}")`);
+                    result = await pyodide.runPythonAsync(`
+                        multi_llm.anthropic_prompt('''${prompt.replace(/'/g, "\\'")}''', "${model}")
+                    `);
+                } else if (provider === 'gemini') {
+                    await pyodide.runPythonAsync(`multi_llm.set_gemini_key("${apiKey}")`);
+                    result = await pyodide.runPythonAsync(`
+                        multi_llm.gemini_prompt('''${prompt.replace(/'/g, "\\'")}''', "${model}")
+                    `);
+                }
+
+                addOutput(result);
+                setStatus('✅ Ready!', 'ready');
+
+            } catch (error) {
+                addOutput(`Error: ${error.message}`, true);
+                setStatus('❌ Error occurred', 'error');
+                console.error(error);
+            } finally {
+                runButton.disabled = false;
+            }
+        }
+
+        // Event listeners
+        runButton.addEventListener('click', runPrompt);
+        clearButton.addEventListener('click', () => {
+            outputEl.textContent = 'Output cleared.';
+        });
+
+        promptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!runButton.disabled) {
+                    runPrompt();
+                }
+            }
+        });
+
+        // Initialize on load
+        initPyodide();
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+</body>
+</html>
