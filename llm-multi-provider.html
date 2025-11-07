@@ -494,10 +494,10 @@
                 console.log('Pyodide loaded, installing packages...');
                 setStatus('⏳ Installing packages (30-60 seconds, be patient)...', 'loading');
 
-                console.log('Loading micropip...');
-                await pyodide.loadPackage(['micropip']);
+                console.log('Loading micropip and SSL support...');
+                await pyodide.loadPackage(['micropip', 'ssl', 'certifi']);
 
-                setStatus('⏳ Installing OpenAI package...', 'loading');
+                setStatus('⏳ Installing HTTP client...', 'loading');
                 console.log('Installing packages...');
 
                 await pyodide.runPythonAsync(`
