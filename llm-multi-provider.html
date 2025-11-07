@@ -331,7 +331,10 @@
         </div>
     </div>
 
-    <script type="module">
+    <!-- Load Pyodide FIRST -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+
+    <script>
         let pyodide;
         let currentProvider = 'openai';
 
@@ -652,10 +655,12 @@
             outputEl.textContent = 'Output cleared.';
         });
 
-        // Initialize on load
-        initPyodide();
+        // Initialize on load - wait for Pyodide to be available
+        if (typeof loadPyodide !== 'undefined') {
+            initPyodide();
+        } else {
+            window.addEventListener('load', initPyodide);
+        }
     </script>
-
-    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
 </body>
 </html>
